@@ -1,0 +1,177 @@
+1.  --To load the json file
+    df=spark.read.json('file:///home/saket/Downloads/ol_cdump.json')
+
+    -- Count No of Rows in data
+    df.count()
+    --148163
+
+2. -- Data Profiling
+    > Flattening the stuct data
+    > Removing Duplicates based on key
+    > Removing data beyond publish date 2021
+
+3. -- Clean the data. Remove null from titles and pages should be greater than 20 and publish year after 1950
+filter_data=spark.sql("""select * from adidas_data where title is not null and number_of_pages > 20 and  publish_date between 1951 and 2022""")
+filter_data.createOrReplaceTempView("filter_adidas_data")
+filter_data.count() : 75429
+
+4 -- Run the following queries on the cleaned dataset:
+     >> Get the book with the most pages.
+     >>> spark.sql("""select title,number_of_pages from filter_adidas_data where number_of_pages = (select max(number_of_pages) from filter_adidas_data) """).show(10,False)
+          +-----------------------------+---------------+
+          |title                        |number_of_pages|
+          +-----------------------------+---------------+
+          |Nihon shokuminchi kenchikuron|48418          |
+          +-----------------------------+---------------+
+
+
+     >>> Find the top 5 genres with most books.
+     >>> spark.sql("""select genres,count(*) cnt from filter_adidas_data where genres is not null group by genres order by cnt desc """).show(5,False)
+      +----------------------+----+
+      |genres                |cnt |
+      +----------------------+----+
+      |[Fiction.]            |2824|
+      |[Biography.]          |2038|
+      |[Juvenile literature.]|1145|
+      |[Exhibitions.]        |774 |
+      |[Guidebooks.]         |424 |
+      +----------------------+----+
+
+
+     >>> Retrieve the top 5 authors who (co-)authored the most books.
+     >>> spark.sql("""select authors.key[0] ,count(*) cnt from  filter_adidas_data where authors.key[0] is not null group by authors.key[0] order by cnt desc """).show(5,False)
+          Authored
+          +-----------------------+---+
+          |authors.key AS `key`[0]|cnt|
+          +-----------------------+---+
+          |/authors/OL1224818A    |236|
+          |/authors/OL4283462A    |116|
+          |/authors/OL785848A     |106|
+          |/authors/OL1926829A    |80 |
+          |/authors/OL883775A     |75 |
+          +-----------------------+---+
+          only showing top 5 rows
+
+          >>> spark.sql("""select authors.key[0] ,count(*) cnt from  filter_adidas_data where authors.key[1] is not null group by authors.key[0] order by cnt desc """).show(20,False)
+          Co-Authored
+          +-----------------------+---+
+          |authors.key AS `key`[0]|cnt|
+          +-----------------------+---+
+          |/authors/OL3447043A    |1  |
+          |/authors/OL194893A     |1  |
+          |/authors/OL1549899A    |1  |
+          |/authors/OL5893410A    |1  |
+          +-----------------------+---+
+
+   >>Per publish year, get the number of authors that published at least one book.
+   >>> spark.sql("""select publish_date ,count(distinct authors.key[0]) cnt from  filter_adidas_data where authors.key[0] is not null group by publish_date order by publish_date desc """).show(200,False)
+   +------------+----+
+   |publish_date|cnt |
+   +------------+----+
+   |2011        |1   |
+   |2010        |2   |
+   |2009        |162 |
+   |2008        |3808|
+   |2007        |2243|
+   |2006        |1149|
+   |2005        |1140|
+   |2004        |1077|
+   |2003        |1221|
+   |2002        |903 |
+   |2001        |747 |
+   |2000        |965 |
+   |1999        |1236|
+   |1998        |1932|
+   |1997        |2100|
+   |1996        |1887|
+   |1995        |2299|
+   |1994        |2076|
+   |1993        |1809|
+   |1992        |1731|
+   |1991        |1537|
+   |1990        |1593|
+   |1989        |1375|
+   |1988        |1212|
+   |1987        |1153|
+   |1986        |1080|
+   |1985        |989 |
+   |1984        |1010|
+   |1983        |967 |
+   |1982        |918 |
+   |1981        |811 |
+   |1980        |852 |
+   |1979        |813 |
+   |1978        |735 |
+   |1977        |704 |
+   |1976        |888 |
+   |1975        |985 |
+   |1974        |1096|
+   |1973        |1135|
+   |1972        |1010|
+   |1971        |1070|
+   |1970        |1139|
+   |1969        |1208|
+   |1968        |1082|
+   |1967        |1243|
+   |1966        |1203|
+   |1965        |1248|
+   |1964        |1194|
+   |1963        |1099|
+   |1962        |1064|
+   |1961        |1026|
+   |1960        |920 |
+   |1959        |830 |
+   |1958        |753 |
+   |1957        |705 |
+   |1956        |638 |
+   |1955        |588 |
+   |1954        |644 |
+   |1953        |600 |
+   |1952        |601 |
+   |1951        |648 |
+   +------------+----+
+
+
+
+   >>Find the number of authors and number of books published per month for years between 1950 and 1970.
+   >>> spark.sql("""select publish_date ,count(distinct authors.key[0]) author_cnt,count(distinct title) book_cnt from  filter_adidas_data where authors.key[0] is not null and publish_date between 1950 and 1970 group by publish_date order by publish_date desc """).show(200,False)
+        +------------+----------+--------+
+        |publish_date|author_cnt|book_cnt|
+        +------------+----------+--------+
+        |1970        |1139      |1211    |
+        |1969        |1208      |1264    |
+        |1968        |1082      |1140    |
+        |1967        |1243      |1308    |
+        |1966        |1203      |1259    |
+        |1965        |1248      |1319    |
+        |1964        |1194      |1255    |
+        |1963        |1099      |1166    |
+        |1962        |1064      |1112    |
+        |1961        |1026      |1064    |
+        |1960        |920       |954     |
+        |1959        |830       |872     |
+        |1958        |753       |785     |
+        |1957        |705       |734     |
+        |1956        |638       |654     |
+        |1955        |588       |607     |
+        |1954        |644       |657     |
+        |1953        |600       |618     |
+        |1952        |601       |632     |
+        |1951        |648       |671     |
+        +------------+----------+--------+
+
+
+
+5.-- How would you design a scheduled data pipeline, which could load this data daily (no need to do any implementation, concept is enough)?
+
+    >> To load the data daily into this given table ,we can load the data from a given path and after processing can store the data in a
+       partition table which can be partitioned on date.
+
+    >> Please explain your overall approach and the design principles applied if any (and why). 
+        How would you implement the testing for the pipeline (unit, integration, UAT/reconciliation)? Please explain your approach with examples.
+        How will you be handling the data merge on target data table(s)? Describe your approach and technical components required.
+
+        We can start with creating a file watcher which checks when the file has arrived at a given location. Once we have recieved the
+        file we can trigger our process to transform the data and load it into the final table.
+        The final table needs to be partitioned table based on load date so that we maintained the history of data.
+        Partitioned table would take care of merging the data into target table. 
